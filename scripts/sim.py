@@ -7,11 +7,12 @@ from utils import *
 import time
 
 input_file = argv[1]
-steps = int(argv[2])
-output_interval = int(argv[3])
+output_file = argv[2]
+steps = int(argv[3])
+output_interval = int(argv[4])
 
 input_path = os.path.join("inputs", input_file)
-output_path = os.path.join("outputs", "output.pdb")
+output_path = os.path.join("outputs", output_file)
 
 pdb = PDBFile(input_path)
 forcefield = ForceField('amber99sb.xml', 'tip3p.xml')
