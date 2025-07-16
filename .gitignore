@@ -1,0 +1,67 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon?
+Icon
+
+# Thumbnails
+._*
+
+# macOS folder attributes
+.Spotlight-V100
+.Trashes
+.VolumeIcon.icns
+
+# macOS metadata files on remote volumes
+com.apple.timemachine.donotpresent
+com.apple.metadata:*
+
+# macOS backup files
+*.swp
+*.swo
+*.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+*.env
+.venv/
+env/
+venv/
+
+# Jupyter
+.ipynb_checkpoints
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+
+# Virtual environments & build
+build/
+dist/
+.eggs/
+*.manifest
+*.spec
+
+# Git ignore template for OpenMM or science
+*.pdb
+*.dcd
+*.xtc
+*.trr
+*.gro
+*.top
+*.log
+*.out
+*.dat
+*.bak
