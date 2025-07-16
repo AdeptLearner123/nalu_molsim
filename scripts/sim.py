@@ -9,6 +9,7 @@ steps = int(argv[2])
 output_interval = int(argv[3])
 
 input_path = os.path.join("inputs", input_file)
+output_path = os.path.join("outputs", "output.pdb")
 
 pdb = PDBFile(input_path)
 forcefield = ForceField('amber99sb.xml', 'tip3p.xml')
@@ -25,6 +26,6 @@ system = forcefield.createSystem(modeller.topology, nonbondedMethod=NoCutoff, co
 integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.002*picoseconds)
 simulation = Simulation(modeller.topology, system, integrator)
 simulation.context.setPositions(modeller.positions)
-simulation.reporters.append(PDBReporter('output.pdb', output_interval))
+simulation.reporters.append(PDBReporter(output_path, output_interval))
 simulation.reporters.append(StateDataReporter(stdout, 1000, step=True, potentialEnergy=True, temperature=True))
-simulation.step(input_path)
+simulation.step(steps)
