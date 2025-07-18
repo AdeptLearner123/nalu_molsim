@@ -17,23 +17,22 @@ input_path = os.path.join("inputs", input_file)
 output_path = os.path.join("outputs", output_file)
 
 pdb = PDBFile(input_path)
-forcefield = ForceField('amber99sb.xml', 'amber99_obc.xml') if implicit_solvent else ForceField('amber99sb.xml', 'tip3p.xml')
-
-# Nalu
-modeller = Modeller(pdb.topology, pdb.positions)
-modeller.addHydrogens(forcefield)
-modeller.addSolvent(forcefield,
-                    model='tip3p',         # Water model (must match forcefield)
-                    padding=1.0*nanometers, # Box padding on all sides
-                    neutralize=True)        # Add counterions if net charge exists
-
 platform = get_best_platform()
+modeller = Modeller(pdb.topology, pdb.positions)
 
 if implicit_solvent:
     print("Using implicit solvent")
+    forcefield = ForceField('amber99sb.xml', 'amber99_obc.xml')
+    modeller.addHydrogens(forcefield)
     system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds)
 else:
     print("Using real solvent")
+    forcefield = ForceField('amber99sb.xml', 'tip3p.xml')
+    modeller.addHydrogens(forcefield)
+    modeller.addSolvent(forcefield,
+                        model='tip3p',         # Water model (must match forcefield)
+                        padding=1.0*nanometers, # Box padding on all sides
+                        neutralize=True)        # Add counterions if net charge exists
     system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds, implicitSolvent=OBC2)
 
 integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.002*picoseconds)
