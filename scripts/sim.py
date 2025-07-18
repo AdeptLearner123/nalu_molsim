@@ -33,6 +33,12 @@ simulation.context.setPositions(modeller.positions)
 simulation.reporters.append(PDBReporter(output_path, output_interval))
 simulation.reporters.append(StateDataReporter(stdout, 1000, step=True, potentialEnergy=True, temperature=True))
 
+if len(argv) > 5 and argv[5] == "y":
+    # Run energy minimization
+    print("Minimizing energy...")
+    simulation.minimizeEnergy()
+    print("Minimization complete.")
+
 start = time.time()
 simulation.step(steps)
 end = time.time()
