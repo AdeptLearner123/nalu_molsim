@@ -10,12 +10,13 @@ input_file = argv[1]
 output_file = argv[2]
 steps = int(argv[3])
 output_interval = int(argv[4])
+minimize_first = len(argv) > 5 and argv[5] == "y"
+implicit_solvent = len(argv) > 6 and argv[6] == "y"
 
 input_path = os.path.join("inputs", input_file)
 output_path = os.path.join("outputs", output_file)
 
 pdb = PDBFile(input_path)
-forcefield = ForceField('amber99sb.xml', 'tip3p.xml')
 
 # Nalu
 modeller = Modeller(pdb.topology, pdb.positions)
@@ -26,14 +27,21 @@ modeller.addSolvent(forcefield,
                     neutralize=True)        # Add counterions if net charge exists
 
 platform = get_best_platform()
-system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds)
+
+if implicit_solvent:
+    forcefield = ForceField('amber99sb.xml', 'amber99_obc.xml')
+    system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds)
+else:
+    forcefield = ForceField('amber99sb.xml', 'tip3p.xml')
+    system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds, implicitSolvent=OBC2)
+
 integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.002*picoseconds)
 simulation = Simulation(modeller.topology, system, integrator, platform)
 simulation.context.setPositions(modeller.positions)
 simulation.reporters.append(PDBReporter(output_path, output_interval))
 simulation.reporters.append(StateDataReporter(stdout, 1000, step=True, potentialEnergy=True, temperature=True))
 
-if len(argv) > 5 and argv[5] == "y":
+if minimize_first:
     # Run energy minimization
     print("Minimizing energy...")
     simulation.minimizeEnergy()
