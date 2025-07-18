@@ -17,6 +17,7 @@ input_path = os.path.join("inputs", input_file)
 output_path = os.path.join("outputs", output_file)
 
 pdb = PDBFile(input_path)
+forcefield = ForceField('amber99sb.xml', 'amber99_obc.xml') if implicit_solvent else ForceField('amber99sb.xml', 'tip3p.xml')
 
 # Nalu
 modeller = Modeller(pdb.topology, pdb.positions)
@@ -29,10 +30,10 @@ modeller.addSolvent(forcefield,
 platform = get_best_platform()
 
 if implicit_solvent:
-    forcefield = ForceField('amber99sb.xml', 'amber99_obc.xml')
+    print("Using implicit solvent")
     system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds)
 else:
-    forcefield = ForceField('amber99sb.xml', 'tip3p.xml')
+    print("Using real solvent")
     system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds, implicitSolvent=OBC2)
 
 integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.002*picoseconds)
