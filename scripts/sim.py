@@ -24,7 +24,7 @@ if implicit_solvent:
     print("Using implicit solvent")
     forcefield = ForceField('amber99sb.xml', 'amber99_obc.xml')
     modeller.addHydrogens(forcefield)
-    system = forcefield.createSystem(modeller.topology, nonbondedMethod=NoCutoff, constraints=HBonds, implicitSolvent=OBC2)
+    system = forcefield.createSystem(modeller.topology, nonbondedMethod=NoCutoff, constraints=HBonds)
 else:
     print("Using real solvent")
     forcefield = ForceField('amber99sb.xml', 'tip3p.xml')
