@@ -24,7 +24,7 @@ if implicit_solvent:
     print("Using implicit solvent")
     forcefield = ForceField('amber99sb.xml', 'amber99_obc.xml')
     modeller.addHydrogens(forcefield)
-    system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds)
+    system = forcefield.createSystem(modeller.topology, nonbondedMethod=NoCutoff, constraints=HBonds, implicitSolvent=OBC2)
 else:
     print("Using real solvent")
     forcefield = ForceField('amber99sb.xml', 'tip3p.xml')
@@ -33,7 +33,7 @@ else:
                         model='tip3p',         # Water model (must match forcefield)
                         padding=1.0*nanometers, # Box padding on all sides
                         neutralize=True)        # Add counterions if net charge exists
-    system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds, implicitSolvent=OBC2)
+    system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds)
 
 integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.002*picoseconds)
 simulation = Simulation(modeller.topology, system, integrator, platform)
