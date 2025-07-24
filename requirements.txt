@@ -1,1 +1,3 @@
 openmm
+openmm-cuda
+numpy==1.26.4
