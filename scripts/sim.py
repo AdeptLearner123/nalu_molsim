@@ -48,6 +48,8 @@ if minimize_first:
     print("Minimization complete.")
 
 start = time.time()
+# Write time=0 structure
+PDBFile.writeFile(simulation.topology, simulation.context.getState(getPositions=True).getPositions(), open(output_path, 'w'))
 simulation.step(steps)
 end = time.time()
 print(f"Execution time: {end - start:.2f} seconds")
