@@ -12,6 +12,7 @@ steps = int(argv[3])
 output_interval = int(argv[4])
 minimize_first = len(argv) > 5 and argv[5] == "y"
 implicit_solvent = len(argv) > 6 and argv[6] == "y"
+freeze_indices = argv[7].split(",") if len(argv) > 7 else None
 
 input_path = os.path.join("inputs", input_file)
 output_path = os.path.join("outputs", output_file)
@@ -46,6 +47,23 @@ if minimize_first:
     print("Minimizing energy...")
     simulation.minimizeEnergy()
     print("Minimization complete.")
+
+if freeze_indices is not None:
+    freeze_indices = set([int(idx) for idx in freeze_indices])
+    # Create the restraint force
+    restraint = CustomExternalForce("1000*(x-x0)^2 + 1000*(y-y0)^2 + 1000*(z-z0)^2")  # in kJ/mol/nm^2
+    restraint.addPerParticleParameter("x0")
+    restraint.addPerParticleParameter("y0")
+    restraint.addPerParticleParameter("z0")
+
+    # Add the atoms you want to freeze (e.g., residue 10)
+    for atom in pdb.topology.atoms():
+        if atom.residue.index in freeze_indices:
+            pos = pdb.positions[atom.index]
+            restraint.addParticle(atom.index, [pos.x, pos.y, pos.z])
+
+    # Add to system
+    system.addForce(restraint)
 
 start = time.time()
 # Write time=0 structure

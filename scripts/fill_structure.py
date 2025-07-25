@@ -6,7 +6,7 @@ from sys import argv
 
 log.verbose()
 env = environ()
-env.io.atom_files_directory = ['structure_fill']
+env.io.atom_files_directory = ['modeler']
 
 file_name = argv[1]
 loop_ranges = argv[2].split(",")
@@ -20,7 +20,7 @@ class MyModel(LoopModel):
     def select_atoms(self):
         return self.select_loop_atoms()
 
-a = MyModel(env, alnfile = f"structure_fill/{file_name}.ali", knowns = f"{file_name}_incomplete", sequence = f"{file_name}_complete")
+a = MyModel(env, alnfile = f"modeler/{file_name}.ali", knowns = f"{file_name}_incomplete", sequence = f"{file_name}_complete")
 
 # Only needed for loop modeling
 a.loop.starting_model = 1
