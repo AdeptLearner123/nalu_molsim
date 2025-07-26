@@ -6,13 +6,6 @@ import os
 from utils import *
 import time
 
-ff = ForceField('amber99sb.xml', 'amber99_obc.xml')
-templates = ff._templates  # WARNING: internal API
-
-for name in sorted(templates):
-    print(name)
-
-
 input_file = argv[1]
 output_file = argv[2]
 steps = int(argv[3])
