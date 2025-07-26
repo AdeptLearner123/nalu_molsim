@@ -6,13 +6,20 @@ import os
 from utils import *
 import time
 
+ff = ForceField('amber99sb.xml', 'amber99_obc.xml')
+templates = ff._templates  # WARNING: internal API
+
+for name in sorted(templates):
+    print(name)
+
+
 input_file = argv[1]
 output_file = argv[2]
 steps = int(argv[3])
 output_interval = int(argv[4])
 minimize_first = len(argv) > 5 and argv[5] == "y"
 implicit_solvent = len(argv) > 6 and argv[6] == "y"
-freeze_indices = argv[7].split(",") if len(argv) > 7 else None
+freeze_ranges = argv[7] if len(argv) > 7 else None
 
 input_path = os.path.join("inputs", input_file)
 output_path = os.path.join("outputs", output_file)
@@ -48,8 +55,13 @@ if minimize_first:
     simulation.minimizeEnergy()
     print("Minimization complete.")
 
-if freeze_indices is not None:
-    freeze_indices = set([int(idx) for idx in freeze_indices])
+if freeze_ranges is not None:
+    freeze_ranges = freeze_ranges.split(",")
+    freeze_ranges = [value.split(":") for value in freeze_ranges]
+    freeze_idxs = sum([zip([chain] * (end - start + 1), range(start, end + 1)) for chain, start, end in freeze_ranges])
+
+    print("Freezing: " + freeze_idxs)
+
     # Create the restraint force
     restraint = CustomExternalForce("1000*(x-x0)^2 + 1000*(y-y0)^2 + 1000*(z-z0)^2")  # in kJ/mol/nm^2
     restraint.addPerParticleParameter("x0")
@@ -58,7 +70,11 @@ if freeze_indices is not None:
 
     # Add the atoms you want to freeze (e.g., residue 10)
     for atom in pdb.topology.atoms():
-        if atom.residue.index in freeze_indices:
+        res = atom.residue
+        chain_id = res.chain.id
+        res_index = res.index  # 0-based index
+
+        if (chain_id, res_index) in freeze_idxs:
             pos = pdb.positions[atom.index]
             restraint.addParticle(atom.index, [pos.x, pos.y, pos.z])
 
