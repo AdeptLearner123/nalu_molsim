@@ -1,18 +1,29 @@
 from openmm.app import *
 from openmm import *
 from openmm.unit import *
-from sys import stdout, argv
+from sys import stdout
 import os
 from utils import *
 import time
+import argparse
 
-input_file = argv[1]
-output_file = argv[2]
-steps = int(argv[3])
-output_interval = int(argv[4])
-minimize_first = len(argv) > 5 and argv[5] == "y"
-implicit_solvent = len(argv) > 6 and argv[6] == "y"
-freeze_ranges = argv[7] if len(argv) > 7 else None
+parser = argparse.ArgumentParser()
+parser.add_argument('input_pdb', type=str, help='Input PDB file')
+parser.add_argument('output_pdb', type=str, help='Output PDB file')
+parser.add_argument('nsteps', type=int, help='Number of MD steps')
+parser.add_argument('report_interval', type=int, help='Reporting interval')
+parser.add_argument('-f', '--freeze_ranges', type=str, default=None)
+parser.add_argument('-m', '--minimize', action='store_true')
+parser.add_argument('-i', '--implicit-solvent', action='store_true')
+args = parser.parse_args()
+
+input_file = args.input_pdb
+output_file = args.output_pdb
+steps = args.nsteps
+output_interval = args.report_interval
+minimize_first = args.minimize
+implicit_solvent = args.implicit_solvent
+freeze_ranges = args.freeze_ranges
 
 input_path = os.path.join("inputs", input_file)
 output_path = os.path.join("outputs", output_file)
@@ -51,15 +62,12 @@ if minimize_first:
 if freeze_ranges is not None:
     freeze_ranges = freeze_ranges.split(",")
     freeze_ranges = [value.split(":") for value in freeze_ranges]
-    freeze_idxs = sum([zip([chain] * (end - start + 1), range(start, end + 1)) for chain, start, end in freeze_ranges])
+    freeze_ranges = [(chain, int(start), int(end)) for chain, start, end in freeze_ranges]
+    freeze_chains = sum([[chain] * (end - start + 1) for chain, start, end in freeze_ranges])
+    freeze_idxs = sum([list(range(start, end + 1)) for _, start, end in freeze_ranges])
+    freeze_idxs = list(zip(freeze_chains, freeze_idxs))
 
-    print("Freezing: " + freeze_idxs)
-
-    # Create the restraint force
-    restraint = CustomExternalForce("1000*(x-x0)^2 + 1000*(y-y0)^2 + 1000*(z-z0)^2")  # in kJ/mol/nm^2
-    restraint.addPerParticleParameter("x0")
-    restraint.addPerParticleParameter("y0")
-    restraint.addPerParticleParameter("z0")
+    print("Freezing: ", freeze_idxs)
 
     # Add the atoms you want to freeze (e.g., residue 10)
     for atom in pdb.topology.atoms():
@@ -68,11 +76,7 @@ if freeze_ranges is not None:
         res_index = res.index  # 0-based index
 
         if (chain_id, res_index) in freeze_idxs:
-            pos = pdb.positions[atom.index]
-            restraint.addParticle(atom.index, [pos.x, pos.y, pos.z])
-
-    # Add to system
-    system.addForce(restraint)
+            system.setParticleMass(atom.index, 0.0*dalton)
 
 start = time.time()
 # Write time=0 structure
