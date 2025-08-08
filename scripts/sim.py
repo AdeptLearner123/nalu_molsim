@@ -47,6 +47,36 @@ else:
                         neutralize=True)        # Add counterions if net charge exists
     system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds)
 
+
+if freeze_ranges is not None:
+    restraint = CustomExternalForce('k*periodicdistance(x, y, z, x0, y0, z0)^2')
+    system.addForce(restraint)
+    restraint.addGlobalParameter('k', 100.0*kilojoules_per_mole/nanometer)
+    restraint.addPerParticleParameter('x0')
+    restraint.addPerParticleParameter('y0')
+    restraint.addPerParticleParameter('z0')
+
+    freeze_ranges = freeze_ranges.split(",")
+    freeze_ranges = [value.split(":") for value in freeze_ranges]
+    freeze_ranges = [(chain, int(start), int(end)) for chain, start, end in freeze_ranges]
+    freeze_chains = sum([[chain] * (end - start + 1) for chain, start, end in freeze_ranges])
+    freeze_idxs = sum([list(range(start, end + 1)) for _, start, end in freeze_ranges])
+    freeze_idxs = list(zip(freeze_chains, freeze_idxs))
+
+
+    # Add the atoms you want to freeze (e.g., residue 10)
+    for atom in pdb.topology.atoms():
+        res = atom.residue
+        chain_id = res.chain.id
+        res_index = res.index  # 0-based index
+
+        if (chain_id, res_index) in freeze_idxs:
+            print("Freezing: ", res_index, chain_id)
+            #system.setParticleMass(atom.index, 0.0*dalton)
+            if atom.name == 'CA':
+                restraint.addParticle(atom.index, pdb.positions[atom.index])
+
+
 integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.002*picoseconds)
 simulation = Simulation(modeller.topology, system, integrator, platform)
 simulation.context.setPositions(modeller.positions)
@@ -58,25 +88,6 @@ if minimize_first:
     print("Minimizing energy...")
     simulation.minimizeEnergy()
     print("Minimization complete.")
-
-if freeze_ranges is not None:
-    freeze_ranges = freeze_ranges.split(",")
-    freeze_ranges = [value.split(":") for value in freeze_ranges]
-    freeze_ranges = [(chain, int(start), int(end)) for chain, start, end in freeze_ranges]
-    freeze_chains = sum([[chain] * (end - start + 1) for chain, start, end in freeze_ranges])
-    freeze_idxs = sum([list(range(start, end + 1)) for _, start, end in freeze_ranges])
-    freeze_idxs = list(zip(freeze_chains, freeze_idxs))
-
-    print("Freezing: ", freeze_idxs)
-
-    # Add the atoms you want to freeze (e.g., residue 10)
-    for atom in pdb.topology.atoms():
-        res = atom.residue
-        chain_id = res.chain.id
-        res_index = res.index  # 0-based index
-
-        if (chain_id, res_index) in freeze_idxs:
-            system.setParticleMass(atom.index, 0.0*dalton)
 
 start = time.time()
 # Write time=0 structure

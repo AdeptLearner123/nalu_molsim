@@ -23,33 +23,15 @@ sheets = args.beta_sheets
 loops = args.loops
 
 
-class MyModel(LoopModel):
-    def _get_loop_atoms(self):
-        loops_list = loops.split(",")
-        loop_ranges = [loop.split(":") for loop in loops_list]
-        selections = [Selection(self.residue_range(f'{start}:{chain}', f'{end}:{chain}')) for (chain, start, end) in loop_ranges]
-        return Selection(selections)
-
-    def select_loop_atoms(self):
-        if loops is not None:
-            return self._get_loop_atoms()
-        else:
-            return None  # No loop refinement
-
-    def select_atoms(self):
-        if loops is not None:
-            return self._get_loop_atoms()
-        else:
-            return Selection(self.residue_range('1:A', '1:A'))  # dummy minimal selection
-        
+class MyAutoModel(AutoModel):
     def special_restraints(self, aln):
         rsr = self.restraints
 
         if helices is not None:
             for helix_range in helices.split(","):
-                start, end = helix_range.split(":")
-                start_res = f"{start}:A"
-                end_res = f"{end}:A"
+                chain, start, end = helix_range.split(":")
+                start_res = f"{start}:{chain}"
+                end_res = f"{end}:{chain}"
                 rsr.add(secondary_structure.alpha(self.residue_range(start_res, end_res)))
         
         if sheets is not None:
@@ -61,7 +43,29 @@ class MyModel(LoopModel):
                 rsr.add(sheet_restraint)
 
 
-a = MyModel(env,
+class MyLoopModel(LoopModel):
+    def _get_loop_atoms(self):
+        loops_list = loops.split(",")
+        loop_ranges = [loop.split(":") for loop in loops_list]
+        selections = [Selection(self.residue_range(f'{start}:{chain}', f'{end}:{chain}')) for (chain, start, end) in loop_ranges]
+        return Selection(selections)
+
+    def select_loop_atoms(self):
+        if loops is not None:
+            return self._get_loop_atoms()
+        else:
+            return Selection(self.atoms) # dummy selection
+
+    def select_atoms(self):
+        if loops is not None:
+            return self._get_loop_atoms()
+        else:
+            return Selection(self.atoms) # dummy selection
+
+use_loop_model = loops is not None
+ModelClass = MyLoopModel if use_loop_model else MyAutoModel
+
+a = ModelClass(env,
               alnfile=f"modeler/{file_name}.ali",
               knowns=templates,
               sequence="target")
