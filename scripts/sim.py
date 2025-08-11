@@ -7,6 +7,82 @@ from utils import *
 import time
 import argparse
 
+def restrain_residues(system,
+                      modeller,                 # use modeller.topology & modeller.positions
+                      freeze_keys,              # {('A','10'), ('B','25')} or {('A',10), ...}
+                      k=1e4 * kilojoule_per_mole / nanometer**2,
+                      ca_only=False,
+                      use_pbc=True,
+                      force_name="PositionalRestraint"):
+    """
+    Add harmonic positional restraints for atoms in residues matching freeze_keys,
+    using coordinates from modeller.positions.
+    """
+    top = modeller.topology
+    pos = modeller.positions  # Quantity (n_atoms, 3)
+    if pos is None:
+        raise ValueError("modeller.positions is None; set positions before calling.")
+
+    n_top = top.getNumAtoms()
+    if len(pos) != n_top or system.getNumParticles() != n_top:
+        raise ValueError(
+            f"Atom count mismatch: top={n_top}, pos={len(pos)}, system={system.getNumParticles()}. "
+            "Ensure the System was created from modeller.topology before calling."
+        )
+
+    expr = ("k*periodicdistance(x,y,z,x0,y0,z0)^2"
+            if use_pbc else
+            "k*((x-x0)^2 + (y-y0)^2 + (z-z0)^2)")
+
+    # Reuse an existing named restraint if present, else create
+    restraint = None
+    for i in range(system.getNumForces()):
+        f = system.getForce(i)
+        try:
+            name = f.getName()
+        except Exception:
+            name = ""
+        if isinstance(f, CustomExternalForce) and name == force_name:
+            restraint = f
+            break
+    if restraint is None:
+        restraint = CustomExternalForce(expr)
+        try:
+            restraint.setName(force_name)
+        except Exception:
+            pass
+        restraint.addGlobalParameter("k", k)
+        restraint.addPerParticleParameter("x0")
+        restraint.addPerParticleParameter("y0")
+        restraint.addPerParticleParameter("z0")
+        system.addForce(restraint)
+
+    def in_freeze_set(chain_id, res):
+        if (chain_id, res.id) in freeze_keys:
+            return True
+        try:
+            return (chain_id, int(res.id)) in freeze_keys
+        except ValueError:
+            return False
+
+    n_added = 0
+    for atom in top.atoms():
+        res = atom.residue
+        if not in_freeze_set(res.chain.id, res):
+            continue
+        if ca_only and atom.name != "CA":
+            continue
+        i = atom.index
+        p = pos[i]  # Quantity Vec3
+        restraint.addParticle(i, [p[0], p[1], p[2]])
+        n_added += 1
+
+    print(f"[restrain_residues] Added restraints to {n_added} atom(s) "
+          f"({'CA-only' if ca_only else 'all atoms'}), k={k}.")
+
+    return restraint
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('input_pdb', type=str, help='Input PDB file')
 parser.add_argument('output_pdb', type=str, help='Output PDB file')
@@ -30,7 +106,9 @@ output_path = os.path.join("outputs", output_file)
 
 pdb = PDBFile(input_path)
 platform = get_best_platform()
+print("Before:", [c.id for c in pdb.topology.chains()])
 modeller = Modeller(pdb.topology, pdb.positions)
+print("After:", [c.id for c in modeller.topology.chains()])
 
 if implicit_solvent:
     print("Using implicit solvent")
@@ -47,36 +125,6 @@ else:
                         neutralize=True)        # Add counterions if net charge exists
     system = forcefield.createSystem(modeller.topology, nonbondedMethod=PME, nonbondedCutoff=1.0*nanometer, constraints=HBonds)
 
-
-if freeze_ranges is not None:
-    restraint = CustomExternalForce('k*periodicdistance(x, y, z, x0, y0, z0)^2')
-    system.addForce(restraint)
-    restraint.addGlobalParameter('k', 100.0*kilojoules_per_mole/nanometer)
-    restraint.addPerParticleParameter('x0')
-    restraint.addPerParticleParameter('y0')
-    restraint.addPerParticleParameter('z0')
-
-    freeze_ranges = freeze_ranges.split(",")
-    freeze_ranges = [value.split(":") for value in freeze_ranges]
-    freeze_ranges = [(chain, int(start), int(end)) for chain, start, end in freeze_ranges]
-    freeze_chains = sum([[chain] * (end - start + 1) for chain, start, end in freeze_ranges])
-    freeze_idxs = sum([list(range(start, end + 1)) for _, start, end in freeze_ranges])
-    freeze_idxs = list(zip(freeze_chains, freeze_idxs))
-
-
-    # Add the atoms you want to freeze (e.g., residue 10)
-    for atom in pdb.topology.atoms():
-        res = atom.residue
-        chain_id = res.chain.id
-        res_index = res.index  # 0-based index
-
-        if (chain_id, res_index) in freeze_idxs:
-            print("Freezing: ", res_index, chain_id)
-            #system.setParticleMass(atom.index, 0.0*dalton)
-            if atom.name == 'CA':
-                restraint.addParticle(atom.index, pdb.positions[atom.index])
-
-
 integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.002*picoseconds)
 simulation = Simulation(modeller.topology, system, integrator, platform)
 simulation.context.setPositions(modeller.positions)
@@ -88,6 +136,16 @@ if minimize_first:
     print("Minimizing energy...")
     simulation.minimizeEnergy()
     print("Minimization complete.")
+
+if freeze_ranges is not None:    
+    freeze_ranges = freeze_ranges.split(",")
+    freeze_ranges = [value.split(":") for value in freeze_ranges]
+    freeze_ranges = [(chain, int(start), int(end)) for chain, start, end in freeze_ranges]
+    freeze_chains = sum([[chain] * (end - start + 1) for chain, start, end in freeze_ranges])
+    freeze_idxs = sum([list(range(start, end + 1)) for _, start, end in freeze_ranges])
+    freeze_idxs = list(zip(freeze_chains, freeze_idxs))
+    restrain_residues(system, modeller, freeze_idxs)
+    simulation.context.reinitialize(preserveState=True)
 
 start = time.time()
 # Write time=0 structure
